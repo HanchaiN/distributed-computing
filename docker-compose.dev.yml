@@ -1,0 +1,28 @@
+include:
+  - ./docker-compose.yml
+
+services:
+  # Worker - can be scaled horizontally
+  worker:
+    build:
+      context: ./src
+      dockerfile: worker.Dockerfile
+    environment:
+      - COORDINATOR_URL=http://coordinator:8000
+      - CACHE_HOST=cache
+      - CACHE_PORT=6379
+      - WORKER_ID=auto
+      - HEARTBEAT_INTERVAL=10
+    depends_on:
+      - coordinator
+      - cache
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
