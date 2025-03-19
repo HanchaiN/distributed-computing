@@ -1,0 +1,59 @@
+services:
+  # Task Queue - Using Redis for simplicity and performance
+  queue:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - queue-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Result Cache - Using Redis as well (in production, might be separate)
+  cache:
+    image: redis:7.0-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - cache-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Coordinator Service
+  coordinator:
+    build:
+      context: ./src
+      dockerfile: coordinator.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - QUEUE_HOST=queue
+      - QUEUE_PORT=6379
+      - CACHE_HOST=cache
+      - CACHE_PORT=6379
+      - WORKER_TIMEOUT=30
+      - TASK_LEASE_TIME=300
+    depends_on:
+      - queue
+      - cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  queue-data:
+  cache-data:
+
+networks:
+  default:
+    driver: bridge
